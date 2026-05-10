@@ -14,6 +14,7 @@
 #include "../header/TextureBMP.h"
 #include <GL/freeglut.h>
 #include <cmath>
+#include <glm/detail/qualifier.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
@@ -35,12 +36,12 @@ vector<SceneObject *> sceneObjects;
 TextureBMP texture;
 
 
-
+// create the stripe pattern on a given object.
 glm::vec3 stripe(Ray ray, glm::vec3 color, SceneObject* obj) {
-   // Stripe pattern
     int stripeWidth = 5;
     int iz = (ray.hit.z) / stripeWidth;
     int k = iz % 2; // 2 colors
+    
     if (k == 0)
       color = glm::vec3(0, 1, 0);
     else
@@ -49,6 +50,7 @@ glm::vec3 stripe(Ray ray, glm::vec3 color, SceneObject* obj) {
 
     float texcoords = (ray.hit.x - -15) / (5 - -15);
     float texcoordt = (ray.hit.z - -60) / (-90 - -60);
+    
     if (texcoords > 0 && texcoords < 1 && texcoordt > 0 && texcoordt < 1) {
       color = texture.getColorAt(texcoords, texcoordt);
       obj->setColor(color);
@@ -56,18 +58,22 @@ glm::vec3 stripe(Ray ray, glm::vec3 color, SceneObject* obj) {
   return color;
 }
 
+// calculate shadows on the specific point on the object that the ray has hit (taking
+// into account the location of the lights)
 glm::vec3 shadow(glm::vec3 color, SceneObject* obj, glm::vec3 lightPos, Ray ray) {
   color = obj->lighting(lightPos, -ray.dir, ray.hit); // Object's colour
   glm::vec3 lightVec = lightPos - ray.hit;
   Ray shadowRay(ray.hit, lightVec);
   shadowRay.closestPt(sceneObjects);
   shadowRay.dist = lightVec.length();
+  
   if (shadowRay.index > -1) {
     color = (0.2f * 1 / shadowRay.dist) * obj->getColor();
   }
   return color;
 }
 
+//when a ray hits an object, create a reflection ray and return it
 Ray createReflectionRay(SceneObject* obj, Ray ray) {
     glm::vec3 normalVec = obj->normal(ray.hit);
     glm::vec3 reflectedDir = glm::reflect(ray.dir, normalVec);
@@ -87,8 +93,8 @@ glm::vec3 trace(Ray ray, int step) {
   ray.closestPt(sceneObjects); // Compare the ray with all objects in the scene
   if (ray.index == -1)
     return backgroundCol;        // no intersection
-  obj = sceneObjects[ray.index]; // object on which the closest point of
-                                 // intersection is found
+  obj = sceneObjects[ray.index]; // object on which the closest point of intersection is found
+
   if (ray.index == 0) {
     color = stripe(ray, color, obj);
   }
@@ -146,6 +152,19 @@ void display() {
   glFlush();
 }
 
+void createSphere(glm::vec3 color, glm::vec3 location, float radius, int specularity, vector<SceneObject *>* sceneObjects, float reflectivity) {
+  Sphere *sphere1 = new Sphere(location, radius);
+  sphere1->setColor(color); // Set colour to blue
+  sphere1->setSpecularity(specularity);
+  if (reflectivity > 0) {
+      sphere1->setReflectivity(true, reflectivity);
+  } 
+  else {
+    sphere1->setReflectivity(false);
+  }
+  sceneObjects->push_back(sphere1); // Add sphere to scene objects
+}
+
 //---This function initializes the scene
 //-------------------------------------------
 //   Specifically, it creates scene objects (spheres, planes, cones, cylinders
@@ -168,23 +187,14 @@ void initialize() {
   plane->setShininess(false);
   sceneObjects.push_back(plane);
 
-  Sphere *sphere1 = new Sphere(glm::vec3(-5.0, 0.0, -120.0), 15.0);
-  sphere1->setColor(glm::vec3(0, 0, 1)); // Set colour to blue
-  sphere1->setSpecularity(50);
-  sphere1->setReflectivity(true, 0.8);
-  sceneObjects.push_back(sphere1); // Add sphere to scene objects
+  createSphere(glm::vec3(0, 0, 1), glm::vec3(-5.0, 0.0, -120.0), 15.0, 50, &sceneObjects, 0.5);
 
-  Sphere *sphere2 = new Sphere(glm::vec3(8, 7, -60.0), 5.0);
-  sphere2->setColor(glm::vec3(0, 1, 1)); // Set colour to cyan
-  sceneObjects.push_back(sphere2);       // Add sphere to scene objects
+  createSphere(glm::vec3(0, 1, 1), glm::vec3(8, 7, -60.0), 5.0, 0, &sceneObjects, 0);
 
-  Sphere *sphere3 = new Sphere(glm::vec3(-8, 5, -70.0), 1.0);
-  sphere3->setColor(glm::vec3(0, 1, 0)); // Set colour to green
-  sceneObjects.push_back(sphere3);       // Add sphere to scene objects
+  createSphere(glm::vec3(0, 1, 0), glm::vec3(-8, 5, -70.0), 2.0, 0, &sceneObjects, 0);
 
-  Sphere *sphere4 = new Sphere(glm::vec3(15, -5, -70.0), 7.0);
-  sphere4->setColor(glm::vec3(1, 0, 0)); // Set colour to red
-  sceneObjects.push_back(sphere4);       // Add sphere to scene objects
+  createSphere(glm::vec3(1, 0, 0), glm::vec3(15, -5, -70.0), 7.0, 0, &sceneObjects, 0);
+
 }
 
 int main(int argc, char *argv[]) {
