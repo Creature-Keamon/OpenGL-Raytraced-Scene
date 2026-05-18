@@ -13,6 +13,7 @@
 #include "../header/Sphere.h"
 #include "../header/TextureBMP.h"
 #include <GL/freeglut.h>
+#include <GL/gl.h>
 #include <cmath>
 #include <glm/detail/qualifier.hpp>
 #include <glm/ext/vector_float3.hpp>
@@ -24,10 +25,10 @@
 using namespace std;
 
 const float EDIST = 40.0;
-const int NUMDIV = 500;
-const int MAX_STEPS = 5;
-const float XMIN = -10.0;
-const float XMAX = 10.0;
+const int NUMDIV = 1500;
+const int MAX_STEPS = 10;
+const float XMIN = -17.77;
+const float XMAX = 17.77;
 const float YMIN = -10.0;
 const float YMAX = 10.0;
 
@@ -85,7 +86,7 @@ Ray createReflectionRay(SceneObject* obj, Ray ray) {
 //   Computes the colour value obtained by tracing a ray and finding its
 //   closest point of intersection with objects in the scene.
 glm::vec3 trace(Ray ray, int step) {
-  glm::vec3 backgroundCol(1);     // Background colour = (0,0,0)
+  glm::vec3 backgroundCol(0.2);     // Background colour = (0,0,0)
   glm::vec3 lightPos(10, 40, -3); // Light's position
   glm::vec3 color(0);
   SceneObject *obj;
@@ -98,6 +99,19 @@ glm::vec3 trace(Ray ray, int step) {
   if (ray.index == 0) {
     color = stripe(ray, color, obj);
   }
+  if (ray.index == 1) {
+    color = glm::vec3(1,1,0);
+    return color;
+  }
+  if (ray.index == 2) {
+    color = glm::vec3(1,0,0);
+    return color;
+  }
+  if (ray.index == 3) {
+    color = glm::vec3(1,0,1);
+    return color;
+  }
+
 
   color = shadow(color, obj, lightPos, ray);
 
@@ -154,7 +168,7 @@ void display() {
 
 void createSphere(glm::vec3 color, glm::vec3 location, float radius, int specularity, vector<SceneObject *>* sceneObjects, float reflectivity) {
   Sphere *sphere1 = new Sphere(location, radius);
-  sphere1->setColor(color); // Set colour to blue
+  sphere1->setColor(color); 
   sphere1->setSpecularity(specularity);
   if (reflectivity > 0) {
       sphere1->setReflectivity(true, reflectivity);
@@ -163,6 +177,15 @@ void createSphere(glm::vec3 color, glm::vec3 location, float radius, int specula
     sphere1->setReflectivity(false);
   }
   sceneObjects->push_back(sphere1); // Add sphere to scene objects
+}
+
+void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
+  Plane *backPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z),glm::vec3(size.x/2,-size.y/2,size.z),glm::vec3(size.x/2,size.y/2,size.z),glm::vec3(-size.x/2,size.y/2,size.z));
+  sceneObjects->push_back(backPlane);
+  Plane *leftPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,-size.z),glm::vec3(-size.x/2,-size.y/2,size.z),glm::vec3(-size.x/2,size.y/2,size.z),glm::vec3(-size.x/2,size.y/2,-size.z));
+  sceneObjects->push_back(leftPlane);
+  Plane *rightPlane = new Plane(glm::vec3(size.x/2,-size.y/2,-size.z),glm::vec3(size.x/2,-size.y/2,size.z),glm::vec3(size.x/2,size.y/2,size.z),glm::vec3(size.x/2,size.y/2,-size.z));
+  sceneObjects->push_back(rightPlane);
 }
 
 //---This function initializes the scene
@@ -181,11 +204,13 @@ void initialize() {
 
   glClearColor(0, 0, 0, 1);
 
-  Plane *plane = new Plane(glm::vec3(-20, -15, -40), glm::vec3(20, -15, -40),
-                           glm::vec3(20, -15, -200), glm::vec3(-20, -15, -200));
+  Plane *plane = new Plane(glm::vec3(-50, -15, -40), glm::vec3(50, -15, -40),
+                           glm::vec3(50, -15, -200), glm::vec3(-50, -15, -200));
   plane->setColor(glm::vec3(0.8, 0.8, 0));
   plane->setShininess(false);
   sceneObjects.push_back(plane);
+
+  createSkybox(glm::vec3(100.0,100.0,-180.0), &sceneObjects);
 
   createSphere(glm::vec3(0, 0, 1), glm::vec3(-5.0, 0.0, -120.0), 15.0, 50, &sceneObjects, 0.5);
 
@@ -200,7 +225,7 @@ void initialize() {
 int main(int argc, char *argv[]) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
-  glutInitWindowSize(500, 500);
+  glutInitWindowSize(1280, 720);
   glutInitWindowPosition(20, 20);
   glutCreateWindow("Raytracing");
 
