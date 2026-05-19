@@ -1,12 +1,3 @@
-/*==================================================================================
- * COSC 363  Computer Graphics
- * Department of Computer Science and Software Engineering, University of
- * Canterbury.
- *
- * A basic ray tracer
- * See Lab07.pdf   for details.
- *===================================================================================
- */
 #include "../header/Plane.h"
 #include "../header/Ray.h"
 #include "../header/SceneObject.h"
@@ -15,11 +6,11 @@
 #include <GL/freeglut.h>
 #include <GL/gl.h>
 #include <cmath>
+#include <cstddef>
 #include <glm/detail/qualifier.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
-#include <iostream>
 #include <vector>
 
 using namespace std;
@@ -111,9 +102,29 @@ glm::vec3 trace(Ray ray, int step) {
     color = glm::vec3(1,0,1);
     return color;
   }
+  if (ray.index == 4) {
+    color = glm::vec3(0,1,0);
+    return color;
+  }
 
 
   color = shadow(color, obj, lightPos, ray);
+
+  if (obj->isRefractive() && step < MAX_STEPS) {
+    float trans = obj->getTransparencyCoeff();
+    float refr = obj->getRefractionCoeff();
+    glm::vec3 n = obj->normal(ray.hit);
+    float eta2 = obj->getRefractiveIndex();
+    glm::vec3 d = ray.dir;
+    glm::vec3 g = glm::refract(d, n, 1/eta2);
+    Ray refrRay = Ray(ray.hit, g);
+    refrRay.closestPt(sceneObjects);
+    glm::vec3 m = obj->normal(refrRay.hit);
+    glm::vec3 h = glm::refract(g,-m, eta2/1);
+    Ray newRay = Ray(refrRay.hit, h);
+    glm::vec3 refractColor = trace(newRay, step+1);
+    color = ((float)0.9*color) + refractColor;
+  }
 
   if (obj->isReflective() && step < MAX_STEPS) {
     float rho = obj->getReflectionCoeff();
@@ -166,13 +177,16 @@ void display() {
   glFlush();
 }
 
-void createSphere(glm::vec3 color, glm::vec3 location, float radius, int specularity, vector<SceneObject *>* sceneObjects, float reflectivity) {
+void createSphere(glm::vec3 color, glm::vec3 location, float radius, int specularity, vector<SceneObject *>* sceneObjects, float reflectivity, float refraction = 1) {
   Sphere *sphere1 = new Sphere(location, radius);
   sphere1->setColor(color); 
   sphere1->setSpecularity(specularity);
   if (reflectivity > 0) {
       sphere1->setReflectivity(true, reflectivity);
-  } 
+  } else if (refraction > 1) {
+    sphere1->setReflectivity((float)0.1);
+    sphere1->setRefractivity(refraction);
+  }
   else {
     sphere1->setReflectivity(false);
   }
@@ -180,23 +194,29 @@ void createSphere(glm::vec3 color, glm::vec3 location, float radius, int specula
 }
 
 void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
-  Plane *backPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z),glm::vec3(size.x/2,-size.y/2,size.z),glm::vec3(size.x/2,size.y/2,size.z),glm::vec3(-size.x/2,size.y/2,size.z));
+  Plane *backPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z),
+                               glm::vec3(size.x/2,-size.y/2,size.z),
+                               glm::vec3(size.x/2,size.y/2,size.z),
+                               glm::vec3(-size.x/2,size.y/2,size.z));
   sceneObjects->push_back(backPlane);
-  Plane *leftPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,-size.z),glm::vec3(-size.x/2,-size.y/2,size.z),glm::vec3(-size.x/2,size.y/2,size.z),glm::vec3(-size.x/2,size.y/2,-size.z));
+  Plane *leftPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,-size.z),
+                               glm::vec3(-size.x/2,-size.y/2,size.z),
+                               glm::vec3(-size.x/2,size.y/2,size.z),
+                               glm::vec3(-size.x/2,size.y/2,-size.z));
   sceneObjects->push_back(leftPlane);
-  Plane *rightPlane = new Plane(glm::vec3(size.x/2,-size.y/2,-size.z),glm::vec3(size.x/2,-size.y/2,size.z),glm::vec3(size.x/2,size.y/2,size.z),glm::vec3(size.x/2,size.y/2,-size.z));
+  Plane *rightPlane = new Plane(glm::vec3(size.x/2,-size.y/2,-size.z),
+                                glm::vec3(size.x/2,-size.y/2,size.z),
+                                glm::vec3(size.x/2,size.y/2,size.z),
+                                glm::vec3(size.x/2,size.y/2,-size.z));
   sceneObjects->push_back(rightPlane);
+  Plane *behindPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,-size.z),
+                                 glm::vec3(size.x/2,-size.y/2,-size.z),
+                                 glm::vec3(size.x/2,size.y/2,-size.z),
+                                 glm::vec3(-size.x/2,size.y/2,-size.z));
+  sceneObjects->push_back(behindPlane);
 }
 
-//---This function initializes the scene
-//-------------------------------------------
-//   Specifically, it creates scene objects (spheres, planes, cones, cylinders
-//   etc)
-//     and add them to the list of scene objects.
-//   It also initializes the OpenGL 2D orthographc projection matrix for drawing
-//   the
-//     the ray traced image.
-//----------------------------------------------------------------------------------
+
 void initialize() {
   texture = TextureBMP("../assets/Butterfly.bmp");
   glMatrixMode(GL_PROJECTION);
@@ -214,7 +234,7 @@ void initialize() {
 
   createSphere(glm::vec3(0, 0, 1), glm::vec3(-5.0, 0.0, -120.0), 15.0, 50, &sceneObjects, 0.5);
 
-  createSphere(glm::vec3(0, 1, 1), glm::vec3(8, 7, -60.0), 5.0, 0, &sceneObjects, 0);
+  createSphere(glm::vec3(0, 1, 1), glm::vec3(8, 7, -60.0), 5.0, 0, &sceneObjects, 0, 1.5);
 
   createSphere(glm::vec3(0, 1, 0), glm::vec3(-8, 5, -70.0), 2.0, 0, &sceneObjects, 0);
 
