@@ -6,7 +6,6 @@
 #include <GL/freeglut.h>
 #include <GL/gl.h>
 #include <cmath>
-#include <cstddef>
 #include <glm/detail/qualifier.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
@@ -107,23 +106,24 @@ glm::vec3 trace(Ray ray, int step) {
     return color;
   }
 
-
   color = shadow(color, obj, lightPos, ray);
 
   if (obj->isRefractive() && step < MAX_STEPS) {
-    float trans = obj->getTransparencyCoeff();
+    float eta2 = obj->getRefractiveIndex();
     float refr = obj->getRefractionCoeff();
     glm::vec3 n = obj->normal(ray.hit);
-    float eta2 = obj->getRefractiveIndex();
     glm::vec3 d = ray.dir;
     glm::vec3 g = glm::refract(d, n, 1/eta2);
     Ray refrRay = Ray(ray.hit, g);
     refrRay.closestPt(sceneObjects);
+    
     glm::vec3 m = obj->normal(refrRay.hit);
-    glm::vec3 h = glm::refract(g,-m, eta2/1);
+    glm::vec3 h = glm::refract(g,-m, 1/eta2);
     Ray newRay = Ray(refrRay.hit, h);
-    glm::vec3 refractColor = trace(newRay, step+1);
-    color = ((float)0.9*color) + refractColor;
+    newRay.closestPt(sceneObjects);
+    glm::vec3 refractColor = trace(newRay, step + 1);
+    
+    color = color + (refr * refractColor);
   }
 
   if (obj->isReflective() && step < MAX_STEPS) {
@@ -177,19 +177,18 @@ void display() {
   glFlush();
 }
 
-void createSphere(glm::vec3 color, glm::vec3 location, float radius, int specularity, vector<SceneObject *>* sceneObjects, float reflectivity, float refraction = 1) {
+void createSphere(glm::vec3 color, glm::vec3 location, float radius, int specularity, vector<SceneObject *>* sceneObjects, float reflectivity, float refrcoeff = 1, float refrind = 0) {
   Sphere *sphere1 = new Sphere(location, radius);
   sphere1->setColor(color); 
   sphere1->setSpecularity(specularity);
   if (reflectivity > 0) {
       sphere1->setReflectivity(true, reflectivity);
-  } else if (refraction > 1) {
-    sphere1->setReflectivity((float)0.1);
-    sphere1->setRefractivity(refraction);
+  } 
+  if (refrcoeff < 1) {
+    //sphere1->setTransparency(true, refrcoeff);
+    sphere1->setRefractivity(true, refrcoeff, refrind);
   }
-  else {
-    sphere1->setReflectivity(false);
-  }
+
   sceneObjects->push_back(sphere1); // Add sphere to scene objects
 }
 
@@ -232,13 +231,13 @@ void initialize() {
 
   createSkybox(glm::vec3(100.0,100.0,-180.0), &sceneObjects);
 
-  createSphere(glm::vec3(0, 0, 1), glm::vec3(-5.0, 0.0, -120.0), 15.0, 50, &sceneObjects, 0.5);
+  createSphere(glm::vec3(0, 0, 1), glm::vec3(-5, 0, -120), 15.0, 50, &sceneObjects, 0.5);
 
-  createSphere(glm::vec3(0, 1, 1), glm::vec3(8, 7, -60.0), 5.0, 0, &sceneObjects, 0, 1.5);
+  createSphere(glm::vec3(1, 1, 1), glm::vec3(8, 7, -50), 5.0, 50, &sceneObjects, 0, 0.6, 1.5);
 
   createSphere(glm::vec3(0, 1, 0), glm::vec3(-8, 5, -70.0), 2.0, 0, &sceneObjects, 0);
 
-  createSphere(glm::vec3(1, 0, 0), glm::vec3(15, -5, -70.0), 7.0, 0, &sceneObjects, 0);
+  createSphere(glm::vec3(1, 0, 0), glm::vec3(15, 5, -90), 7.0, 0, &sceneObjects, 0);
 
 }
 
