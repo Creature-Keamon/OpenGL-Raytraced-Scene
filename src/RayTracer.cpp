@@ -14,6 +14,7 @@
 
 using namespace std;
 
+const bool aliasing = false;
 const float EDIST = 40.0;
 const int NUMDIV = 800;
 const int MAX_STEPS = 10;
@@ -21,7 +22,7 @@ const float XMIN = -17.77;
 const float XMAX = 17.77;
 const float YMIN = -10.0;
 const float YMAX = 10.0;
-glm::vec3 lightPos(0, 10, 30);
+glm::vec3 lightPos(20, 10, 30);
 
 vector<SceneObject *> sceneObjects;
 
@@ -59,12 +60,13 @@ glm::vec3 shadow(SceneObject* obj, Ray ray) {
   Ray shadowRay(ray.hit, normLight);
   shadowRay.closestPt(sceneObjects);
   shadowRay.dist = normLight.length();
-  glm::vec3 RQ = ray.hit * shadowRay.hit;
-  glm::vec3 LQ = lightPos * shadowRay.hit;
-  if (abs(glm::length(RQ)) < abs(glm::length(LQ))) {
+  
+  float RQ = glm::distance(shadowRay.hit,ray.hit);
+  float LQ = glm::distance(lightPos, ray.hit);
+  
+  if (RQ < LQ) {
     if (shadowRay.index > -1) {
       SceneObject* hitObj = sceneObjects[shadowRay.index];
-      
       if (hitObj->isRefractive() || hitObj->isTransparent()) {
         glm::vec3 ambient = 0.2f * obj->getColor();
         glm::vec3 diffSpec = color - ambient;
@@ -124,6 +126,19 @@ glm::vec3 trace(Ray ray, int step) {
     color = color + (refr * refractColor);
   }
 
+  if (obj->isTransparent() && step <MAX_STEPS) {
+    float trans = obj->getTransparencyCoeff();
+    glm::vec3 n = obj->normal(ray.hit);
+    glm::vec3 d = ray.dir;
+    Ray refrRay = Ray(ray.hit, d);
+    refrRay.closestPt(sceneObjects);
+    
+    Ray newRay = Ray(refrRay.hit, d);
+    newRay.closestPt(sceneObjects);
+    glm::vec3 transparentColor = trace(newRay, step + 1);
+    color = color + (trans * transparentColor);
+  }
+
   if (obj->isReflective() && step < MAX_STEPS) {
     float rho = obj->getReflectionCoeff();
     Ray reflectedRay = createReflectionRay(obj, ray);
@@ -155,38 +170,43 @@ void display() {
       glm::vec3 dir(xp+ 0.5 * cellX, yp + 0.5 * cellY, -EDIST);
       Ray ray = Ray(eye,dir);
       glm::vec3 col = trace(ray, 1);
-      
-      if (col.x == prevcolor.x && col.y == prevcolor.y && col.z == prevcolor.z) {
+      if (aliasing) {
+        if (col.x == prevcolor.x && col.y == prevcolor.y && col.z == prevcolor.z) {
         glColor3f(col.x,col.y,col.z);
-      } 
-      else {
-        glm::vec3 dir0(xp + 0.75 * cellX, yp + 0.75 * cellY,
-                    -EDIST); // direction of the top left ray
-        Ray ray0 = Ray(eye, dir0);
-        glm::vec3 col0 = trace(ray0, 1);
-        
-        glm::vec3 dir1(xp + 0.75 * cellX, yp + 0.25 * cellY,
-                      -EDIST); // direction of the bottom left ray
-        Ray ray1 = Ray(eye, dir1);
-        glm::vec3 col1 = trace(ray1, 1);
-        
-        glm::vec3 dir2(xp + 0.25 * cellX, yp + 0.25 * cellY,
-                      -EDIST); // direction of the bottom right ray
-        Ray ray2 = Ray(eye, dir2);
-        glm::vec3 col2 = trace(ray2, 1);
-        
-        glm::vec3 dir3(xp + 0.25 * cellX, yp + 0.75 * cellY,
-                      -EDIST); // direction of the top right ray
-        Ray ray3 = Ray(eye, dir3);
-        glm::vec3 col3 = trace(ray3, 1);
+        } 
+        else {
+          glm::vec3 dir0(xp + 0.75 * cellX, yp + 0.75 * cellY,
+                      -EDIST); // direction of the top left ray
+          Ray ray0 = Ray(eye, dir0);
+          glm::vec3 col0 = trace(ray0, 1);
+          
+          glm::vec3 dir1(xp + 0.75 * cellX, yp + 0.25 * cellY,
+                        -EDIST); // direction of the bottom left ray
+          Ray ray1 = Ray(eye, dir1);
+          glm::vec3 col1 = trace(ray1, 1);
+          
+          glm::vec3 dir2(xp + 0.25 * cellX, yp + 0.25 * cellY,
+                        -EDIST); // direction of the bottom right ray
+          Ray ray2 = Ray(eye, dir2);
+          glm::vec3 col2 = trace(ray2, 1);
+          
+          glm::vec3 dir3(xp + 0.25 * cellX, yp + 0.75 * cellY,
+                        -EDIST); // direction of the top right ray
+          Ray ray3 = Ray(eye, dir3);
+          glm::vec3 col3 = trace(ray3, 1);
 
-        glm::vec3 average((col0.r + col1.r + col2.r + col3.r)/4, 
-                          (col0.g + col1.g + col2.g + col3.g)/4, 
-                          (col0.b + col1.b + col2.b + col3.b)/4);
+          glm::vec3 average((col0.r + col1.r + col2.r + col3.r)/4, 
+                            (col0.g + col1.g + col2.g + col3.g)/4, 
+                            (col0.b + col1.b + col2.b + col3.b)/4);
 
-        prevcolor = average;
-        glColor3f(average.x, average.g,average.b);   
+          prevcolor = average;
+          glColor3f(average.x, average.g,average.b);   
+        }
       }
+      else {
+        glColor3f(col.x,col.y,col.z);
+      }
+      
       
       glVertex2f(xp, yp); // Draw each cell with its color value
       glVertex2f(xp + cellX, yp);
@@ -206,33 +226,42 @@ Sphere* createSphere(glm::vec3 color, glm::vec3 location, float radius) {
   return sphere1;
 }
 
-void colourSphere(Sphere *sphere, int spec, float reflcoeff, float refrcoeff = 1, float refrind = 0) {
+void colourSphere(Sphere *sphere, int spec, float reflcoeff, float refrcoeff = 1, float refrind = 0, float transcoeff = 1) {
   sphere->setSpecularity(spec);
   if (reflcoeff > 0) {
       sphere->setReflectivity(true, reflcoeff);
   } 
   if (refrcoeff < 1) {
-    //sphere1->setTransparency(true, refrcoeff);
     sphere->setRefractivity(true, refrcoeff, refrind);
+  }
+  if (transcoeff <1) {
+    sphere->setTransparency(true, transcoeff);
   }
 }
 
 void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
-  Plane *backPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z*2),
-                               glm::vec3(size.x/2,-size.y/2,size.z*2),
-                               glm::vec3(size.x/2,size.y/2,size.z*2),
-                               glm::vec3(-size.x/2,size.y/2,size.z*2));
+  Plane *plane = new Plane(glm::vec3(-50, -15, 250), 
+                           glm::vec3(50, -15, 250),
+                           glm::vec3(50, -15, -250), 
+                           glm::vec3(-50, -15, -250));
+  plane->setColor(glm::vec3(0.8, 0.8, 0));
+  plane->setShininess(false);
+  sceneObjects->push_back(plane);
+  Plane *backPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z/2),
+                               glm::vec3(size.x/2,-size.y/2,size.z/2),
+                               glm::vec3(size.x/2,size.y/2,size.z/2),
+                               glm::vec3(-size.x/2,size.y/2,size.z/2));
   backPlane->setColor(glm::vec3(1,1,0));
-  //sceneObjects->push_back(backPlane);
-  Plane *leftPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z*2),
+  sceneObjects->push_back(backPlane);
+  Plane *leftPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z/2),
                                glm::vec3(-size.x/2,-size.y/2,-size.z/2),
                                glm::vec3(-size.x/2,size.y/2,-size.z/2),
-                               glm::vec3(-size.x/2,size.y/2,size.z*2));
+                               glm::vec3(-size.x/2,size.y/2,size.z/2));
   leftPlane->setColor(glm::vec3(0,1,1));                           
   sceneObjects->push_back(leftPlane);
   Plane *rightPlane = new Plane(glm::vec3(size.x/2,-size.y/2,-size.z/2),
-                                glm::vec3(size.x/2,-size.y/2,size.z*2),
-                                glm::vec3(size.x/2,size.y/2,size.z*2),
+                                glm::vec3(size.x/2,-size.y/2,size.z/2),
+                                glm::vec3(size.x/2,size.y/2,size.z/2),
                                 glm::vec3(size.x/2,size.y/2,-size.z/2));
   rightPlane->setColor(glm::vec3(1,0,0));                              
   sceneObjects->push_back(rightPlane);
@@ -248,7 +277,7 @@ void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
                                  glm::vec3(size.x/2,size.y/2,-size.z/2),
                                  glm::vec3(-size.x/2,size.y/2,-size.z/2));
   roofPlane->setColor(glm::vec3(0,0,1));                                   
-  //sceneObjects->push_back(roofPlane);
+  sceneObjects->push_back(roofPlane);
 
 }
 
@@ -260,30 +289,24 @@ void initialize() {
 
   glClearColor(0, 0, 0, 1);
 
-  Plane *plane = new Plane(glm::vec3(-50, -15, -40), 
-                           glm::vec3(50, -15, -40),
-                           glm::vec3(50, -15, -200), 
-                           glm::vec3(-50, -15, -200));
-  plane->setColor(glm::vec3(0.8, 0.8, 0));
-  plane->setShininess(false);
-  sceneObjects.push_back(plane);
 
-  createSkybox(glm::vec3(100.0,100.0,300.0), &sceneObjects);
+  createSkybox(glm::vec3(100.0,100.0,500.0), &sceneObjects);
   
   Sphere * sphere1 = createSphere(glm::vec3(0, 0, 1), 
             glm::vec3(-5, 0, -120), 15.0);
   colourSphere(sphere1, 50, 0.1);
-  //sceneObjects.push_back(sphere1);
+  sceneObjects.push_back(sphere1);
 
-  Sphere *sphere2 = createSphere(glm::vec3(0.1, 0.1, 0.1), 
-            glm::vec3(-8, 0, -50), 5.0);
-  colourSphere(sphere2, 50, 0.1, 0.6, 1.5);
+  Sphere *sphere2 = createSphere(glm::vec3(0, 0.1, 0), 
+            glm::vec3(-12, 0, -50), 5.0);
+  colourSphere(sphere2, 50, 0.1, 0.6, 1.1);
   sceneObjects.push_back(sphere2);
 
-  Sphere *sphere3 = createSphere(glm::vec3(0, 1, 0), 
-            glm::vec3(-8, 5, -100), 2.0);
-  colourSphere(sphere3, 0, 0.0);
-  //sceneObjects.push_back(sphere3);
+
+  Sphere * sphere3 = createSphere(glm::vec3(0.1, 0, 0), 
+            glm::vec3(10, 0, -50), 5.0);
+  colourSphere(sphere3, 50, 0.1,1,1.01, 0.5);
+  sceneObjects.push_back(sphere3);
 
 }
 
