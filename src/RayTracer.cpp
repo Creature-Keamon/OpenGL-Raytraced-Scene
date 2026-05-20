@@ -21,6 +21,7 @@ const float XMIN = -17.77;
 const float XMAX = 17.77;
 const float YMIN = -10.0;
 const float YMAX = 10.0;
+glm::vec3 lightPos(0, 10, 30);
 
 vector<SceneObject *> sceneObjects;
 
@@ -51,27 +52,31 @@ glm::vec3 stripe(Ray ray, glm::vec3 color, SceneObject* obj) {
 
 // calculate shadows on the specific point on the object that the ray has hit (taking
 // into account the location of the lights)
-glm::vec3 shadow(SceneObject* obj, glm::vec3 lightPos, Ray ray) {
+glm::vec3 shadow(SceneObject* obj, Ray ray) {
   glm::vec3 color = obj->lighting(lightPos, -ray.dir, ray.hit); // Object's colour
-  glm::vec3 lightVec = lightPos - ray.hit;
-  Ray shadowRay(ray.hit, lightVec);
+  glm::vec3 lightDir = lightPos - ray.hit;
+  glm::vec3 normLight = glm::normalize(lightDir);
+  Ray shadowRay(ray.hit, normLight);
   shadowRay.closestPt(sceneObjects);
-  shadowRay.dist = lightVec.length();
-  
-  if (shadowRay.index > -1) {
-    SceneObject* hitObj = sceneObjects[shadowRay.index];
-    
-    if (hitObj->isRefractive() || hitObj->isTransparent()) {
-      glm::vec3 ambient = 0.2f * obj->getColor();
-      glm::vec3 diffSpec = color - ambient;
-      color = ambient + 0.7f*diffSpec;
-      return color;
+  shadowRay.dist = normLight.length();
+  glm::vec3 RQ = ray.hit * shadowRay.hit;
+  glm::vec3 LQ = lightPos * shadowRay.hit;
+  if (abs(glm::length(RQ)) < abs(glm::length(LQ))) {
+    if (shadowRay.index > -1) {
+      SceneObject* hitObj = sceneObjects[shadowRay.index];
+      
+      if (hitObj->isRefractive() || hitObj->isTransparent()) {
+        glm::vec3 ambient = 0.2f * obj->getColor();
+        glm::vec3 diffSpec = color - ambient;
+        color = ambient + 0.7f*diffSpec;
+      }
+      else {
+        color = (0.2f * obj->getColor());
+      }   
     }
-    else {
-      color = (0.2f * obj->getColor());
-    }   
   }
-    return color;
+  
+  return color;
 }
 
 //when a ray hits an object, create a reflection ray and return it
@@ -87,7 +92,6 @@ Ray createReflectionRay(SceneObject* obj, Ray ray) {
 //   closest point of intersection with objects in the scene.
 glm::vec3 trace(Ray ray, int step) {
   glm::vec3 backgroundCol(0.2); 
-  glm::vec3 lightPos(5,20,-40);
   glm::vec3 color(0);
   SceneObject *obj;
 
@@ -100,7 +104,7 @@ glm::vec3 trace(Ray ray, int step) {
     color = stripe(ray, color, obj);
   }
 
-  color = shadow(obj, lightPos, ray);
+  color = shadow(obj, ray);
 
   if (obj->isRefractive() && step < MAX_STEPS) {
     float eta2 = obj->getRefractiveIndex();
@@ -214,21 +218,21 @@ void colourSphere(Sphere *sphere, int spec, float reflcoeff, float refrcoeff = 1
 }
 
 void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
-  Plane *backPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z/2),
-                               glm::vec3(size.x/2,-size.y/2,size.z/2),
-                               glm::vec3(size.x/2,size.y/2,size.z/2),
-                               glm::vec3(-size.x/2,size.y/2,size.z/2));
+  Plane *backPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z*2),
+                               glm::vec3(size.x/2,-size.y/2,size.z*2),
+                               glm::vec3(size.x/2,size.y/2,size.z*2),
+                               glm::vec3(-size.x/2,size.y/2,size.z*2));
   backPlane->setColor(glm::vec3(1,1,0));
-  sceneObjects->push_back(backPlane);
-  Plane *leftPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,-size.z/2),
-                               glm::vec3(-size.x/2,-size.y/2,size.z/2),
-                               glm::vec3(-size.x/2,size.y/2,size.z/2),
-                               glm::vec3(-size.x/2,size.y/2,-size.z/2));
-  leftPlane->setColor(glm::vec3(0,1,0));                           
+  //sceneObjects->push_back(backPlane);
+  Plane *leftPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z*2),
+                               glm::vec3(-size.x/2,-size.y/2,-size.z/2),
+                               glm::vec3(-size.x/2,size.y/2,-size.z/2),
+                               glm::vec3(-size.x/2,size.y/2,size.z*2));
+  leftPlane->setColor(glm::vec3(0,1,1));                           
   sceneObjects->push_back(leftPlane);
   Plane *rightPlane = new Plane(glm::vec3(size.x/2,-size.y/2,-size.z/2),
-                                glm::vec3(size.x/2,-size.y/2,size.z/2),
-                                glm::vec3(size.x/2,size.y/2,size.z/2),
+                                glm::vec3(size.x/2,-size.y/2,size.z*2),
+                                glm::vec3(size.x/2,size.y/2,size.z*2),
                                 glm::vec3(size.x/2,size.y/2,-size.z/2));
   rightPlane->setColor(glm::vec3(1,0,0));                              
   sceneObjects->push_back(rightPlane);
@@ -239,12 +243,12 @@ void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
   behindPlane->setColor(glm::vec3(1,0,1));                                 
   sceneObjects->push_back(behindPlane);
   
-  Plane *roofPlane = new Plane(glm::vec3(-size.x/2,size.y/2,size.z/2),
-                                glm::vec3(size.x/2,size.y/2,size.z/2),
+  Plane *roofPlane = new Plane(glm::vec3(-size.x/2,size.y/2,size.z*2),
+                                glm::vec3(size.x/2,size.y/2,size.z*2),
                                  glm::vec3(size.x/2,size.y/2,-size.z/2),
                                  glm::vec3(-size.x/2,size.y/2,-size.z/2));
   roofPlane->setColor(glm::vec3(0,0,1));                                   
-sceneObjects->push_back(roofPlane);
+  //sceneObjects->push_back(roofPlane);
 
 }
 
@@ -264,7 +268,7 @@ void initialize() {
   plane->setShininess(false);
   sceneObjects.push_back(plane);
 
-  createSkybox(glm::vec3(100.0,100.0,-300.0), &sceneObjects);
+  createSkybox(glm::vec3(100.0,100.0,300.0), &sceneObjects);
   
   Sphere * sphere1 = createSphere(glm::vec3(0, 0, 1), 
             glm::vec3(-5, 0, -120), 15.0);
@@ -272,7 +276,7 @@ void initialize() {
   //sceneObjects.push_back(sphere1);
 
   Sphere *sphere2 = createSphere(glm::vec3(0.1, 0.1, 0.1), 
-            glm::vec3(8, 0, -50), 5.0);
+            glm::vec3(-8, 0, -50), 5.0);
   colourSphere(sphere2, 50, 0.1, 0.6, 1.5);
   sceneObjects.push_back(sphere2);
 
