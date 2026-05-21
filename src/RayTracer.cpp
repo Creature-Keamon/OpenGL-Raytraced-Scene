@@ -2,7 +2,7 @@
 #include "../header/Ray.h"
 #include "../header/SceneObject.h"
 #include "../header/Sphere.h"
-#include "../header/TextureBMP.h"
+#include "../header/stb_texture.h"
 #include <GL/freeglut.h>
 #include <GL/gl.h>
 #include <cmath>
@@ -14,7 +14,7 @@
 
 using namespace std;
 
-const bool aliasing = false;
+const bool aliasing = true;
 const float EDIST = 40.0;
 const int NUMDIV = 800;
 const int MAX_STEPS = 10;
@@ -26,7 +26,7 @@ glm::vec3 lightPos(20, 10, 30);
 
 vector<SceneObject *> sceneObjects;
 
-TextureBMP texture;
+STBTexture texture;
 
 
 // create the stripe pattern on a given object.
@@ -40,14 +40,18 @@ glm::vec3 stripe(Ray ray, glm::vec3 color, SceneObject* obj) {
     else
       color = glm::vec3(1, 1, 0.5);
     obj->setColor(color);
+  return color;
+}
 
-    float texcoords = (ray.hit.x - -15) / (5 - -15);
-    float texcoordt = (ray.hit.z - -60) / (-90 - -60);
-    
-    if (texcoords > 0 && texcoords < 1 && texcoordt > 0 && texcoordt < 1) {
-      color = texture.getColorAt(texcoords, texcoordt);
-      obj->setColor(color);
-    }
+glm::vec3 applyTexture(Ray ray, glm::vec3 color, SceneObject* obj) {
+  float x1 = -50, x2 = 50;
+  float y1 = -15, y2 = 50;
+  float texcoords = (ray.hit.x - x1) / (x2 - x1);
+  float texcoordt = (ray.hit.y - y1) / (y2 - y1);
+  if (texcoords > 0 && texcoords < 1 && texcoordt > 0 && texcoordt < 1) {
+    color = texture.getColorAt(texcoords, 1-texcoordt);
+    obj->setColor(color);
+  }
   return color;
 }
 
@@ -104,6 +108,12 @@ glm::vec3 trace(Ray ray, int step) {
 
   if (ray.index == 0) {
     color = stripe(ray, color, obj);
+  }
+
+  if (ray.index == 1) {
+    color = applyTexture(ray, color, obj);
+    //color = shadow(obj, ray);
+    return color;
   }
 
   color = shadow(obj, ray);
@@ -247,11 +257,11 @@ void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
   plane->setColor(glm::vec3(0.8, 0.8, 0));
   plane->setShininess(false);
   sceneObjects->push_back(plane);
-  Plane *backPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z/2),
-                               glm::vec3(size.x/2,-size.y/2,size.z/2),
-                               glm::vec3(size.x/2,size.y/2,size.z/2),
-                               glm::vec3(-size.x/2,size.y/2,size.z/2));
-  backPlane->setColor(glm::vec3(1,1,0));
+  Plane *backPlane = new Plane(glm::vec3(size.x/2,-size.y/2,-size.z/2),
+                               glm::vec3(size.x/2,size.y/2,-size.z/2),
+                               glm::vec3(-size.x/2,size.y/2,-size.z/2),
+                               glm::vec3(-size.x/2,-size.y/2,-size.z/2));
+  backPlane->setColor(glm::vec3(1,0,1));                                 
   sceneObjects->push_back(backPlane);
   Plane *leftPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z/2),
                                glm::vec3(-size.x/2,-size.y/2,-size.z/2),
@@ -265,11 +275,12 @@ void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
                                 glm::vec3(size.x/2,size.y/2,-size.z/2));
   rightPlane->setColor(glm::vec3(1,0,0));                              
   sceneObjects->push_back(rightPlane);
-  Plane *behindPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,-size.z/2),
-                                 glm::vec3(size.x/2,-size.y/2,-size.z/2),
-                                 glm::vec3(size.x/2,size.y/2,-size.z/2),
-                                 glm::vec3(-size.x/2,size.y/2,-size.z/2));
-  behindPlane->setColor(glm::vec3(1,0,1));                                 
+  
+  Plane *behindPlane = new Plane(glm::vec3(-size.x/2,-size.y/2,size.z/2),
+                               glm::vec3(size.x/2,-size.y/2,size.z/2),
+                               glm::vec3(size.x/2,size.y/2,size.z/2),
+                               glm::vec3(-size.x/2,size.y/2,size.z/2));
+  behindPlane->setColor(glm::vec3(1,1,0));
   sceneObjects->push_back(behindPlane);
   
   Plane *roofPlane = new Plane(glm::vec3(-size.x/2,size.y/2,size.z*2),
@@ -283,7 +294,7 @@ void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
 
 
 void initialize() {
-  texture = TextureBMP("../assets/Butterfly.bmp");
+  texture = STBTexture("../assets/FlowerField.jpg");
   glMatrixMode(GL_PROJECTION);
   gluOrtho2D(XMIN, XMAX, YMIN, YMAX);
 
@@ -295,10 +306,10 @@ void initialize() {
   Sphere * sphere1 = createSphere(glm::vec3(0, 0, 1), 
             glm::vec3(-5, 0, -120), 15.0);
   colourSphere(sphere1, 50, 0.1);
-  sceneObjects.push_back(sphere1);
+  //sceneObjects.push_back(sphere1);
 
   Sphere *sphere2 = createSphere(glm::vec3(0, 0.1, 0), 
-            glm::vec3(-12, 0, -50), 5.0);
+            glm::vec3(-8, 0, -50), 5.0);
   colourSphere(sphere2, 50, 0.1, 0.6, 1.1);
   sceneObjects.push_back(sphere2);
 
