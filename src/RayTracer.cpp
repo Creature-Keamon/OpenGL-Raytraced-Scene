@@ -14,7 +14,7 @@
 
 using namespace std;
 
-const bool aliasing = true;
+const bool aliasing = false;
 const float EDIST = 40.0;
 const int NUMDIV = 800;
 const int MAX_STEPS = 10;
@@ -116,8 +116,16 @@ glm::vec3 trace(Ray ray, int step) {
     return color;
   }
 
+  if (ray.index == 6 && step < MAX_STEPS) {
+    Ray reflectedRay = createReflectionRay(obj, ray);
+    glm::vec3 reflectedColor = trace(reflectedRay, step + 1);
+    return reflectedColor;
+  }
+
   color = shadow(obj, ray);
 
+
+  //refractions
   if (obj->isRefractive() && step < MAX_STEPS) {
     float eta2 = obj->getRefractiveIndex();
     float refr = obj->getRefractionCoeff();
@@ -136,6 +144,7 @@ glm::vec3 trace(Ray ray, int step) {
     color = color + (refr * refractColor);
   }
 
+  //transparency
   if (obj->isTransparent() && step <MAX_STEPS) {
     float trans = obj->getTransparencyCoeff();
     glm::vec3 n = obj->normal(ray.hit);
@@ -149,6 +158,7 @@ glm::vec3 trace(Ray ray, int step) {
     color = color + (trans * transparentColor);
   }
 
+  //reflections
   if (obj->isReflective() && step < MAX_STEPS) {
     float rho = obj->getReflectionCoeff();
     Ray reflectedRay = createReflectionRay(obj, ray);
@@ -236,6 +246,14 @@ Sphere* createSphere(glm::vec3 color, glm::vec3 location, float radius) {
   return sphere1;
 }
 
+Plane* createMirror() {
+  Plane *plane = new Plane(glm::vec3(-30, -10, -200), 
+                           glm::vec3(30, -10, -200),
+                           glm::vec3(30, 50, -200), 
+                           glm::vec3(-30, 50, -200));
+  return plane;
+}
+
 void colourSphere(Sphere *sphere, int spec, float reflcoeff, float refrcoeff = 1, float refrind = 0, float transcoeff = 1) {
   sphere->setSpecularity(spec);
   if (reflcoeff > 0) {
@@ -289,6 +307,10 @@ void createSkybox(glm::vec3 size, vector<SceneObject *>* sceneObjects) {
                                  glm::vec3(-size.x/2,size.y/2,-size.z/2));
   roofPlane->setColor(glm::vec3(0,0,1));                                   
   sceneObjects->push_back(roofPlane);
+
+  Plane* mirror = createMirror();
+  mirror->setReflectivity(true);
+  sceneObjects->push_back(mirror);
 
 }
 
