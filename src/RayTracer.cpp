@@ -15,7 +15,7 @@
 
 using namespace std;
 
-const bool aliasing = false;
+const bool aliasing = true;
 const float EDIST = 40.0;
 const int NUMDIV = 500;
 const int MAX_STEPS = 4;
@@ -266,8 +266,8 @@ Sphere *createSphere(glm::vec3 color, glm::vec3 location, float radius) {
 }
 
 Plane *createMirror() {
-  Plane *plane = new Plane(glm::vec3(-30, 0, -90), glm::vec3(10, 0, -105),
-                           glm::vec3(10, 20, -100), glm::vec3(-30, 20, -80));
+  Plane *plane = new Plane(glm::vec3(-20, 0, -70), glm::vec3(0, 0, -80),
+                           glm::vec3(0, 20, -75), glm::vec3(-20, 20, -60));
   plane->setColor(glm::vec3(0.2, 0.2, 0.2));
   return plane;
 }
