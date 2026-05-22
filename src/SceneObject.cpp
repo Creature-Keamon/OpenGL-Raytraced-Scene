@@ -77,3 +77,8 @@ void SceneObject::setTransparency(bool flag, float tran_coeff) {
   tran_ = flag;
   tranc_ = tran_coeff;
 }
+void SceneObject::setTransform(glm::mat4 transform) {
+  transform = glm::inverse(transform);
+  normalTransform = glm::transpose(transform);
+  transformMatrix = transform;
+}

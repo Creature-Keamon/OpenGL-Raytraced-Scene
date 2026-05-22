@@ -8,26 +8,29 @@
 
 #ifndef H_SPHERE
 #define H_SPHERE
-#include <glm/glm.hpp>
 #include "SceneObject.h"
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/glm.hpp>
 
 /**
  * Defines a simple Sphere located at 'center'
  * with the specified radius
  */
 class Sphere : public SceneObject {
+
 private:
-	glm::vec3 center = glm::vec3(0);
-	float radius = 1;
+  glm::vec3 center = glm::vec3(0);
+  float radius = 1;
 
 public:
-	Sphere() {};  //Default constructor creates a unit sphere
+  Sphere(){}; // Default constructor creates a unit sphere
 
-	Sphere(glm::vec3 c, float r) : center(c), radius(r) {}
+  Sphere(glm::vec3 c, float r) : center(c), radius(r) {}
 
-	float intersect(glm::vec3 p0, glm::vec3 dir);
+  float intersect(glm::vec3 p0, glm::vec3 dir);
 
-	glm::vec3 normal(glm::vec3 p);
+  glm::vec3 normal(glm::vec3 p);
 };
 
-#endif //!H_SPHERE
+#endif //! H_SPHERE
