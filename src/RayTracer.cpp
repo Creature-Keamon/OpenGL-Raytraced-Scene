@@ -6,28 +6,33 @@
 #include <GL/gl.h>
 #include <cmath>
 #include <glm/detail/qualifier.hpp>
+#include <glm/ext/scalar_constants.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include "../header/Object.h"
+#include <glm/gtc/random.hpp>
+#include <list>
 
 using namespace std;
 using namespace glm;
 
 const bool aliasing = false;
+const bool softShadows = false;
 const float EDIST = 40.0;
-const int NUMDIV = 500;
+const int NUMDIV = 600;
 const int MAX_STEPS = 4;
 const float XMIN = -10;
 const float XMAX = 10;
 const float YMIN = -10.0;
 const float YMAX = 10.0;
 vec3 lightPos1(-15, 10, -10);
-vec3 lightPos2(15, 10, -10);
-vec3 spotLight(0,20,-50);
+float radius = 1;
+//vec3 lightPos2(15, 10, -10);
+vec3 spotLight(0,20,-10);
 float cutoff = 10;
-vec3 direction(0,0,0);
+vec3 direction(0,-1,-1);
 
 mat4 transform = mat4(1.0);
 vector<SceneObject *> sceneObjects;
@@ -57,6 +62,10 @@ vec3 checker(Ray ray, vec3 color, SceneObject *obj) {
   return color;
 }
 
+vec2 createRandomVec(float radius) {
+  return diskRand(radius);
+}
+
 vec3 applyTexture(Ray ray, vec3 color, SceneObject *obj) {
   float x1 = -50, x2 = 50;
   float y1 = -15, y2 = 50;
@@ -71,7 +80,7 @@ vec3 applyTexture(Ray ray, vec3 color, SceneObject *obj) {
 
 // calculate shadows on the specific point on the object that the ray has hit
 // (taking into account the location of the lights)
-vec3 shadow(SceneObject *obj, Ray ray, vec3 lightPos, bool tex = false, bool spot = false) {
+vec3 shadow(SceneObject *obj, Ray ray, vec3 lightPos, bool tex = false, bool spot = false, bool area = false) {
   vec3 color(0);
   if (tex) {
     color = obj->getColor();
@@ -79,33 +88,71 @@ vec3 shadow(SceneObject *obj, Ray ray, vec3 lightPos, bool tex = false, bool spo
     color = obj->lighting(lightPos, -ray.dir, ray.hit); // Object's colour
   }
 
-  vec3 lightDir = lightPos - ray.hit;
-  Ray shadowRay(ray.hit, lightDir);
-  shadowRay.closestPt(sceneObjects);
-  shadowRay.dist = lightDir.length();
 
-  float RQ = distance(shadowRay.hit, ray.hit);
-  float LQ = distance(lightPos, ray.hit);
-  
-  vec3 normDir = normalize(direction);
-  vec3 shadowNorm = -normalize(shadowRay.dir);
-  float dotProd = dot(normDir, shadowNorm);
-  float angle = acos(dotProd);
-  
-  if (shadowRay.index > -1) {
-    if ((spot && angle > cutoff) || (RQ < LQ && !spot)){
-        SceneObject *hitObj = sceneObjects[shadowRay.index];
+  if (area) {
+    list<vec3> colors;
+    for (int i = 0; i < 10; i++) {
+        vec2 loc = createRandomVec(radius);
+        vec3 lightDir = vec3(loc.x+lightPos.x, lightPos.y, loc.y+lightPos.z) - ray.hit;
+        Ray shadowRay(ray.hit, lightDir);
+        shadowRay.closestPt(sceneObjects);
+        shadowRay.dist = lightDir.length();
+        float RQ = distance(shadowRay.hit, ray.hit);
+        float LQ = distance(lightPos, ray.hit);
+        vec3 normDir = normalize(direction);
+        vec3 shadowNorm = normalize(-shadowRay.dir);
+        float dotProd = dot(shadowNorm,normDir);
+        float angle = (180*acos(dotProd))/M_PI;
 
-        if (hitObj->isRefractive() || hitObj->isTransparent()) {
-          vec3 ambient = 0.2f * obj->getColor();
-          vec3 diffSpec = color - ambient;
-          color = ambient + 0.7f * diffSpec;
-        } 
-        else {
-          color = 0.2f * obj->getColor();
+        if (shadowRay.index > -1) {
+            if ((spot && angle > cutoff) || (RQ < LQ && !spot)){
+                SceneObject *hitObj = sceneObjects[shadowRay.index];
+
+                if ((hitObj->isRefractive() || hitObj->isTransparent()) && !spot) {
+                vec3 ambient = 0.2f * obj->getColor();
+                vec3 diffSpec = color - ambient;
+                color = ambient + 0.7f * diffSpec;
+                }
+                else {
+                color = 0.2f * obj->getColor();
+                }
+            }
         }
-      }
+        colors.push_back(color);
     }
+    color = vec3(0);
+    for (vec3 newColor: colors) {
+        color = color + newColor;
+    } 
+    color /=colors.size();
+  }
+  else {
+    vec3 lightDir = lightPos - ray.hit;
+    Ray shadowRay(ray.hit, lightDir);
+    shadowRay.closestPt(sceneObjects);
+    shadowRay.dist = lightDir.length();
+    vec3 normDir = normalize(direction);
+    vec3 shadowNorm = normalize(-shadowRay.dir);
+    float dotProd = dot(shadowNorm,normDir);
+    float angle = (180*acos(dotProd))/M_PI;
+
+    float RQ = distance(shadowRay.hit, ray.hit);
+    float LQ = distance(lightPos, ray.hit);
+    if (shadowRay.index > -1) {
+        if ((spot && angle > cutoff) || (RQ < LQ && !spot)){
+            SceneObject *hitObj = sceneObjects[shadowRay.index];
+
+            if ((hitObj->isRefractive() || hitObj->isTransparent()) && !spot) {
+            vec3 ambient = 0.2f * obj->getColor();
+            vec3 diffSpec = color - ambient;
+            color = ambient + 0.7f * diffSpec;
+            }
+            else {
+            color = 0.2f * obj->getColor();
+            }
+        }
+    }
+  }
   return color;
 }
 
@@ -137,7 +184,7 @@ vec3 trace(Ray ray, int step) {
 
   if (ray.index == 1) {
     color = applyTexture(ray, color, obj);
-    color = shadow(obj, ray, spotLight, true,true);
+    color = shadow(obj, ray, lightPos1, true,false, softShadows);
     return color;
   }
 
@@ -147,7 +194,7 @@ vec3 trace(Ray ray, int step) {
     return reflectedColor;
   }
 
-  color = shadow(obj, ray, spotLight, false, true);
+  color = shadow(obj, ray, lightPos1, false, false, softShadows);
 
   // refractions
   if (obj->isRefractive() && step < MAX_STEPS) {
@@ -274,7 +321,7 @@ void initialize() {
 
   createSkybox(vec3(100.0, 100.0, 500.0), &sceneObjects);
 
-  Sphere *sphere1 = createSphere(vec3(0, 0, 1), vec3(0, 0, -50), 3.0);
+  Sphere *sphere1 = createSphere(vec3(0, 0, 1), vec3(0, -2, -50), 3);
   colourSphere(sphere1, 50, 0.1);
   mat4 transform = mat4(1.0);
   transform = scale(transform, vec3(0.5, 1.0, 0.5));
@@ -282,12 +329,12 @@ void initialize() {
   sceneObjects.push_back(sphere1);
 
   Sphere *sphere2 =
-      createSphere(vec3(0, 0.1, 0), vec3(-8, 0, -50), 4.0);
+      createSphere(vec3(0, 0.1, 0), vec3(-8, -1, -50), 4.0);
   colourSphere(sphere2, 50, 0.1, 0.6, 1.1);
   sceneObjects.push_back(sphere2);
 
   Sphere *sphere3 =
-      createSphere(vec3(0.1, 0, 0), vec3(8, 0, -50), 4.0);
+      createSphere(vec3(0.1, 0, 0), vec3(8, -1, -50), 4.0);
   colourSphere(sphere3, 50, 0.1, 1, 1.01, 0.5);
   sceneObjects.push_back(sphere3);
 }
