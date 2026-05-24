@@ -1,8 +1,8 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 #include "Cylinder.h"
-#include "Sphere.h"
 #include "Plane.h"
+#include "Sphere.h"
 #include <vector>
 
 Sphere *createSphere(glm::vec3 color, glm::vec3 location, float radius) {
@@ -23,7 +23,7 @@ Cylinder *createCylinder(glm::vec3 color, glm::vec3 location, glm::vec3 size) {
 Plane *createMirror() {
   Plane *plane = new Plane(glm::vec3(-10, 5, -80), glm::vec3(10, 5, -80),
                            glm::vec3(10, 20, -75), glm::vec3(-10, 20, -77));
-  //plane->setColor(glm::vec3(0.2, 0.2, 0.2));
+  // plane->setColor(glm::vec3(0.2, 0.2, 0.2));
   return plane;
 }
 

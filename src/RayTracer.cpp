@@ -1,3 +1,4 @@
+#include "../header/Object.h"
 #include "../header/Ray.h"
 #include "../header/SceneObject.h"
 #include "../header/Sphere.h"
@@ -11,7 +12,6 @@
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include "../header/Object.h"
 #include <glm/gtc/random.hpp>
 #include <list>
 
@@ -30,10 +30,9 @@ const float YMAX = 10.0;
 vec3 lightPos1(-10, 10, -10);
 float radius = 1;
 
-
-vec3 spotLight(12,20,-10);
+vec3 spotLight(12, 20, -10);
 float cutoff = 10;
-vec3 direction(-1,-1.5,-1);
+vec3 direction(-1, -1.5, -1);
 
 mat4 transform = mat4(1.0);
 vector<SceneObject *> sceneObjects;
@@ -64,9 +63,7 @@ vec3 checker(Ray ray, vec3 color, SceneObject *obj) {
   return color;
 }
 
-vec2 createRandomVec(float radius) {
-  return diskRand(radius);
-}
+vec2 createRandomVec(float radius) { return diskRand(radius); }
 
 vec3 applyTexture(Ray ray, vec3 color, SceneObject *obj) {
   float x1 = -50, x2 = 50;
@@ -81,30 +78,31 @@ vec3 applyTexture(Ray ray, vec3 color, SceneObject *obj) {
 }
 
 vec3 applySphereTexture(Ray ray, vec3 color, SceneObject *obj) {
-  vec3 ray2 = normalize(ray.hit-vec3(-4,3,-60));
-  float texcoords = (0.5 + (atan2(ray2.z,ray2.x))/(2*M_PI));
-  float texcoordt = 1-(0.5 + (asin(ray2.y)/M_PI));
-  if (texcoords >= 0 && texcoords <=1 && texcoordt >= 0 && texcoordt <= 1) {
+  vec3 ray2 = normalize(ray.hit - vec3(-4, 3, -60));
+  float texcoords = (0.5 + (atan2(ray2.z, ray2.x)) / (2 * M_PI));
+  float texcoordt = 1 - (0.5 + (asin(ray2.y) / M_PI));
+  if (texcoords >= 0 && texcoords <= 1 && texcoordt >= 0 && texcoordt <= 1) {
     color = texture2.getColorAt(texcoords, 1 - texcoordt);
     obj->setColor(color);
   }
   return color;
 }
 
-vec3 shadowRayCalc(Ray ray, vec3 lightDir, vec3 lightPos, bool spot, SceneObject *obj, vec3 color) {
+vec3 shadowRayCalc(Ray ray, vec3 lightDir, vec3 lightPos, bool spot,
+                   SceneObject *obj, vec3 color) {
   Ray shadowRay(ray.hit, lightDir);
   shadowRay.closestPt(sceneObjects);
   shadowRay.dist = lightDir.length();
-  
+
   if (shadowRay.index > -1) {
     vec3 normDir = normalize(direction);
     vec3 shadowNorm = normalize(-shadowRay.dir);
-    float dotProd = dot(shadowNorm,normDir);
-    float angle = (180*acos(dotProd))/M_PI;
+    float dotProd = dot(shadowNorm, normDir);
+    float angle = (180 * acos(dotProd)) / M_PI;
 
     float RQ = distance(shadowRay.hit, ray.hit);
     float LQ = distance(lightPos, ray.hit);
-    
+
     if (RQ < LQ || spot && angle > cutoff) {
       SceneObject *hitObj = sceneObjects[shadowRay.index];
 
@@ -112,11 +110,10 @@ vec3 shadowRayCalc(Ray ray, vec3 lightDir, vec3 lightPos, bool spot, SceneObject
         vec3 ambient = 0.1f * obj->getColor();
         vec3 diffSpec = color - ambient;
         color = ambient + 0.5f * diffSpec;
-        if (spot && angle > cutoff){
+        if (spot && angle > cutoff) {
           color = ambient;
         }
-      }
-      else {
+      } else {
         color = 0.1f * obj->getColor();
       }
     }
@@ -126,7 +123,9 @@ vec3 shadowRayCalc(Ray ray, vec3 lightDir, vec3 lightPos, bool spot, SceneObject
 
 // calculate shadows on the specific point on the object that the ray has hit
 // (taking into account the location of the lights)
-vec3 shadow(SceneObject *obj, Ray ray, vec3 lightPos, bool tex = false, bool spot = false, bool area = false, vec3 lightPos1 = glm::vec3(0)) {
+vec3 shadow(SceneObject *obj, Ray ray, vec3 lightPos, bool tex = false,
+            bool spot = false, bool area = false,
+            vec3 lightPos1 = glm::vec3(0)) {
   vec3 color(0);
   vec3 refColor(0);
   vec3 color1(0);
@@ -135,48 +134,70 @@ vec3 shadow(SceneObject *obj, Ray ray, vec3 lightPos, bool tex = false, bool spo
     color = obj->getColor();
     refColor = color;
   } else {
-    color = obj->lighting(lightPos, -ray.dir, ray.hit, lightPos1); // Object's colour
+    color = obj->lighting(lightPos, -ray.dir, ray.hit,
+                          lightPos1); // Object's colour
     refColor = color;
   }
 
-
-  if (area) { //if the light source is an area light (soft shadows)
+  if (area) { // if the light source is an area light (soft shadows)
     list<vec3> colors;
-    for (int i = 0; i < 4; i++) {
+
+    if (tex) {
+      color1 = obj->getColor();
+    } else {
+      color1 = obj->lighting(lightPos, -ray.dir, ray.hit,
+                             lightPos1); // Object's colour
+    }
+    refColor1 = color1;
+    for (int i = 0; i < 15; i++) {
+      if (tex) {
+        color = obj->getColor();
+        refColor = color;
+      } else {
+        color = obj->lighting(lightPos, -ray.dir, ray.hit,
+                              lightPos1); // Object's colour
+        refColor = color;
+      }
       vec2 loc = createRandomVec(radius);
-      vec3 lightDir = vec3(loc.x+lightPos.x, lightPos.y, loc.y+lightPos.z) - ray.hit;
+      vec3 lightDir = lightPos - ray.hit;
       color = shadowRayCalc(ray, lightDir, lightPos, spot, obj, color);
+
       if (lightPos1 != vec3(0)) {
-        if (tex) {
-          color1 = obj->getColor();
+        vec3 lightDir1 =
+            vec3(lightPos1.x + loc.x, lightPos1.y, lightPos1.z + loc.y) -
+            ray.hit;
+        color1 = shadowRayCalc(ray, lightDir1, lightPos1, false, obj, color1);
+        if (color1 != refColor1 && color != refColor) {
+          color = 0.1f * obj->getColor();
         } else {
-          color1 = obj->lighting(lightPos1, -ray.dir, ray.hit, lightPos); // Object's colour
+          color = color1 + color;
         }
-        refColor1 = color1;
-        vec3 lightDir1 = lightPos1 - ray.hit;
-        color1 = shadowRayCalc(ray, lightDir1, lightPos1, false, obj, color1);     
-        color = color1 + color;
       }
       colors.push_back(color);
     }
-    for (vec3 newColor: colors) {
-        color = color + newColor;
-    } 
-    color /=colors.size();
-  }
-  else {
+    color = vec3(0);
+    for (vec3 newColor : colors) {
+      color = color + newColor;
+    }
+    color /= colors.size();
+  } else {
     vec3 lightDir = lightPos - ray.hit;
     color = shadowRayCalc(ray, lightDir, lightPos, spot, obj, color);
     if (lightPos1 != vec3(0)) {
       if (tex) {
         color1 = obj->getColor();
       } else {
-        color1 = obj->lighting(lightPos1, -ray.dir, ray.hit, lightPos); // Object's colour
+        color1 = obj->lighting(lightPos, -ray.dir, ray.hit,
+                               lightPos1); // Object's colour
       }
       refColor1 = color1;
       vec3 lightDir1 = lightPos1 - ray.hit;
-      color1 = shadowRayCalc(ray, lightDir1, lightPos1, false, obj, color1);     
-      color = color1 + color;
+      color1 = shadowRayCalc(ray, lightDir1, lightPos1, false, obj, color1);
+      if (color1 != refColor1 && color != refColor) {
+        color = 0.1f * obj->getColor();
+      } else {
+        color = color1 + color;
+      }
     }
   }
   return color;
@@ -209,7 +230,7 @@ vec3 trace(Ray ray, int step) {
 
   if (ray.index == 1) {
     color = applyTexture(ray, color, obj);
-    color = shadow(obj, ray, spotLight,true, true, softShadows, lightPos1);
+    color = shadow(obj, ray, spotLight, true, true, softShadows, lightPos1);
     return color;
   }
 
@@ -221,7 +242,7 @@ vec3 trace(Ray ray, int step) {
 
   if (ray.index == 10 && step < MAX_STEPS) {
     color = applySphereTexture(ray, color, obj);
-    color = shadow(obj, ray, spotLight,true, true, softShadows, lightPos1);
+    color = shadow(obj, ray, spotLight, true, true, softShadows, lightPos1);
     return color;
   }
 
@@ -272,8 +293,7 @@ vec3 trace(Ray ray, int step) {
 }
 
 void display() {
-  float xp, yp; // grid point
-  vec3 prevcolor(0, 0, 0);
+  float xp, yp;                         // grid point
   float cellX = (XMAX - XMIN) / NUMDIV; // cell width
   float cellY = (YMAX - YMIN) / NUMDIV; // cell height
   vec3 eye(0., 0., 0.);
@@ -288,47 +308,41 @@ void display() {
     xp = XMIN + (x * cellX);
     for (int y = 0; y < NUMDIV; y++) {
       yp = YMIN + (y * cellY);
-      vec3 dir(xp + 0.5 * cellX, yp + 0.5 * cellY, -EDIST);
-      Ray ray = Ray(eye, dir);
-      vec3 col = trace(ray, 1);
 
       if (aliasing) {
-        if (col.x == prevcolor.x && col.y == prevcolor.y &&
-            col.z == prevcolor.z) {
-          glColor3f(col.x, col.y, col.z);
-        }
 
-        else {
-          vec3 dir0(xp + 0.75 * cellX, yp + 0.75 * cellY,
-                         -EDIST); // direction of the top left ray
-          Ray ray0 = Ray(eye, dir0);
-          vec3 col0 = trace(ray0, 1);
+        vec3 dir0(xp + 0.75 * cellX, yp + 0.75 * cellY,
+                  -EDIST); // direction of the top left ray
+        Ray ray0 = Ray(eye, dir0);
+        vec3 col0 = trace(ray0, 1);
 
-          vec3 dir1(xp + 0.75 * cellX, yp + 0.25 * cellY,
-                         -EDIST); // direction of the bottom left ray
-          Ray ray1 = Ray(eye, dir1);
-          vec3 col1 = trace(ray1, 1);
+        vec3 dir1(xp + 0.75 * cellX, yp + 0.25 * cellY,
+                  -EDIST); // direction of the bottom left ray
+        Ray ray1 = Ray(eye, dir1);
+        vec3 col1 = trace(ray1, 1);
 
-          vec3 dir2(xp + 0.25 * cellX, yp + 0.25 * cellY,
-                         -EDIST); // direction of the bottom right ray
-          Ray ray2 = Ray(eye, dir2);
-          vec3 col2 = trace(ray2, 1);
+        vec3 dir2(xp + 0.25 * cellX, yp + 0.25 * cellY,
+                  -EDIST); // direction of the bottom right ray
+        Ray ray2 = Ray(eye, dir2);
+        vec3 col2 = trace(ray2, 1);
 
-          vec3 dir3(xp + 0.25 * cellX, yp + 0.75 * cellY,
-                         -EDIST); // direction of the top right ray
-          Ray ray3 = Ray(eye, dir3);
-          vec3 col3 = trace(ray3, 1);
+        vec3 dir3(xp + 0.25 * cellX, yp + 0.75 * cellY,
+                  -EDIST); // direction of the top right ray
+        Ray ray3 = Ray(eye, dir3);
+        vec3 col3 = trace(ray3, 1);
 
-          vec3 average((col0.r + col1.r + col2.r + col3.r) / 4,
-                            (col0.g + col1.g + col2.g + col3.g) / 4,
-                            (col0.b + col1.b + col2.b + col3.b) / 4);
+        vec3 average((col0.r + col1.r + col2.r + col3.r) / 4,
+                     (col0.g + col1.g + col2.g + col3.g) / 4,
+                     (col0.b + col1.b + col2.b + col3.b) / 4);
 
-          glColor3f(average.x, average.g, average.b);
-          prevcolor = average;
-        }
+        glColor3f(average.x, average.g, average.b);
+
       }
 
       else {
+        vec3 dir(xp + 0.5 * cellX, yp + 0.5 * cellY, -EDIST);
+        Ray ray = Ray(eye, dir);
+        vec3 col = trace(ray, 1);
         glColor3f(col.x, col.y, col.z);
       }
 
@@ -353,6 +367,7 @@ void initialize() {
 
   createSkybox(vec3(100.0, 100.0, 500.0), &sceneObjects);
 
+  // transformed sphere (pill shaped thing)
   Sphere *sphere1 = createSphere(vec3(0, 0, 1), vec3(0, -1.5, -50), 3);
   colourSphere(sphere1, 50, 0.1);
   mat4 transform = mat4(1.0);
@@ -360,21 +375,23 @@ void initialize() {
   sphere1->setTransform(transform);
   sceneObjects.push_back(sphere1);
 
-  Sphere *sphere2 =
-      createSphere(vec3(0, 0.1, 0), vec3(-8, -1.4, -40), 4.0);
+  // refractive sphere
+  Sphere *sphere2 = createSphere(vec3(0, 0.1, 0), vec3(-8, -1.4, -40), 4.0);
   colourSphere(sphere2, 50, 0.1, 0.6, 1.1);
   sceneObjects.push_back(sphere2);
 
-  Sphere *sphere3 =
-      createSphere(vec3(0.1, 0, 0), vec3(8, -1.4, -40), 4.0);
+  // transparent sphere
+  Sphere *sphere3 = createSphere(vec3(0.1, 0, 0), vec3(8, -1.4, -40), 4.0);
   colourSphere(sphere3, 50, 0.1, 1, 1.01, 0.5);
   sceneObjects.push_back(sphere3);
 
-  Sphere *sphere4 =
-      createSphere(vec3(1,1,1), vec3(-4,3,-60), 4.0);
+  // textured sphere
+  Sphere *sphere4 = createSphere(vec3(1, 1, 1), vec3(-4, 3, -60), 4.0);
   sceneObjects.push_back(sphere4);
 
-  Cylinder *cylinder = createCylinder(vec3(1,0,0.3), vec3(4,5,-60), vec3(1,3,1));
+  // cylinder
+  Cylinder *cylinder =
+      createCylinder(vec3(1, 0, 0.3), vec3(4, 3, -65), vec3(2, 5, 2));
   sceneObjects.push_back(cylinder);
 }
 
