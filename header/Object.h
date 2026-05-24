@@ -1,5 +1,6 @@
 #ifndef OBJECT_H
 #define OBJECT_H
+#include "Cylinder.h"
 #include "Sphere.h"
 #include "Plane.h"
 #include <vector>
@@ -11,9 +12,17 @@ Sphere *createSphere(glm::vec3 color, glm::vec3 location, float radius) {
   return sphere1;
 }
 
+Cylinder *createCylinder(glm::vec3 color, glm::vec3 location, glm::vec3 size) {
+  Cylinder *cylinder = new Cylinder(location, size);
+  cylinder->setRadius();
+  cylinder->setColor(color);
+
+  return cylinder;
+}
+
 Plane *createMirror() {
-  Plane *plane = new Plane(glm::vec3(-20, 0, -70), glm::vec3(0, 0, -80),
-                           glm::vec3(0, 20, -75), glm::vec3(-20, 20, -60));
+  Plane *plane = new Plane(glm::vec3(-10, 5, -80), glm::vec3(10, 5, -80),
+                           glm::vec3(10, 20, -75), glm::vec3(-10, 20, -77));
   //plane->setColor(glm::vec3(0.2, 0.2, 0.2));
   return plane;
 }
@@ -33,7 +42,7 @@ void colourSphere(Sphere *sphere, int spec, float reflcoeff,
   }
 }
 
-void createSkybox(glm::vec3 size, vector<SceneObject *> *sceneObjects) {
+void createSkybox(glm::vec3 size, std::vector<SceneObject *> *sceneObjects) {
   Plane *plane = new Plane(glm::vec3(-50, -5, 250), glm::vec3(50, -5, 250),
                            glm::vec3(50, -5, -250), glm::vec3(-50, -5, -250));
   plane->setColor(glm::vec3(0.8, 0.8, 0));

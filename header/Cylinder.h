@@ -1,24 +1,26 @@
 #ifndef H_CYLINDER
 #define H_CYLINDER
 #include "SceneObject.h"
-#include <glm/ext/matrix_float4x4.hpp>
-#include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 
-using namespace glm;
+
 
 class Cylinder : public SceneObject {
-    private:
+private:
     float R = 0;
-    vec3 location = vec3(0);
-    vec3 size = vec3(0,0,0);
+    glm::vec3 location = glm::vec3(0);
+    glm::vec3 size = glm::vec3(0,0,0);
 
-    public: 
-    Cylinder() {}
-    Cylinder(glm::vec3 l, glm::vec3 s): location(l), size(s), R(sqrt(pow(s.x,2) + pow(s.z,2))) {}
-    float intersect(vec3 p0, vec3 dir);
+public: 
+    Cylinder(){};
+    
+    Cylinder(glm::vec3 l, glm::vec3 s): location(l), size(s) {};
 
-    vec3 normal(vec3 p);
+    void setRadius();
+    
+    float intersect(glm::vec3 p0, glm::vec3 dir);
+
+    glm::vec3 normal(glm::vec3 p);
 };
 
 

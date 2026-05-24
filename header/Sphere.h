@@ -20,10 +20,11 @@
 class Sphere : public SceneObject {
 
 private:
-  glm::vec3 center = glm::vec3(0);
+
   float radius = 1;
 
 public:
+  glm::vec3 center = glm::vec3(0);
   Sphere(){}; // Default constructor creates a unit sphere
 
   Sphere(glm::vec3 c, float r) : center(c), radius(r) {}

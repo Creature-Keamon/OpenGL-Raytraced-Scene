@@ -30,12 +30,13 @@ protected:
   glm::mat4 normalTransform = glm::mat4(1);
 
 public:
+  glm::vec3 center = glm::vec3(1);
   SceneObject() {}
   virtual float intersect(glm::vec3 p0, glm::vec3 dir) = 0;
   virtual glm::vec3 normal(glm::vec3 pos) = 0;
   virtual ~SceneObject() {}
 
-  glm::vec3 lighting(glm::vec3 lightPos, glm::vec3 viewVec, glm::vec3 hit);
+  glm::vec3 lighting(glm::vec3 lightPos, glm::vec3 viewVec, glm::vec3 hit, glm::vec3 lightPos1);
   void setColor(glm::vec3 col);
   void setReflectivity(bool flag);
   void setReflectivity(bool flag, float refl_coeff);

@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8...3.5)
 project(Assignment2)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(RayTracer.out src/RayTracer.cpp src/Ray.cpp src/SceneObject.cpp src/Sphere.cpp src/Plane.cpp src/TextureBMP.cpp)
+add_executable(RayTracer.out src/RayTracer.cpp src/Ray.cpp src/SceneObject.cpp src/Sphere.cpp src/Plane.cpp src/TextureBMP.cpp src/Cylinder.cpp)
 
 set(OpenGL_GL_PREFERENCE GLVND)
 find_package(OpenGL REQUIRED)
